@@ -1,10 +1,25 @@
 # ChRIS_ultron_backEnd
 [![Build Status](https://travis-ci.org/FNNDSC/ChRIS_ultron_backEnd.svg?branch=master)](https://travis-ci.org/FNNDSC/ChRIS_ultron_backEnd)
-[![Code Climate](https://codeclimate.com/github/FNNDSC/ChRIS_ultron_backEnd/badges/gpa.svg)](https://codeclimate.com/github/FNNDSC/ChRIS_ultron_backEnd)
+![License][license-badge]
+![Last Commit][last-commit-badge]
 
 The core back end for the ChRIS system, also known by the anacronym "CUBE". Internally this is instantiated as Django-mysql project offering a collection+json REST API.
 
 ## ChRIS development and testing
+
+## TL;DR
+
+If you read nothing else on this page, and just want to get an instance of ChRIS CUBE up and running with no mess, no fuss (and assuming you have `docker` and friends as described elsewhere on this page):
+
+```bash
+git clone https://github.com/FNNDSC/ChRIS_ultron_backend
+cd ChRIS_ultron_backend
+# Run full CUBE instantiation with tests:
+*destroy* ; sudo rm -fr FS; rm -fr FS; *make*
+
+# Skip unit and integration tests and the intro:
+*destroy* ; sudo rm -fr FS; rm -fr FS; *make* -U -I -s
+```
 
 ### Abstract
 
@@ -15,7 +30,7 @@ This page describes how to quickly get the set of services comprising the backen
 #### Install latest Docker and Docker Compose. Currently tested platforms
 * ``Docker 17.04.0+``
 * ``Docker Compose 1.10.0+``
-* ``Ubuntu (16.04/17.04/17.10) and MAC OS X 10.11+``
+* ``Ubuntu (16.04+) and MAC OS X 10.11+``
 
 #### Make sure to add your computer user to the ``docker group`` in your machine
 
@@ -87,7 +102,7 @@ pip freeze --local
 Start CUBE from the repository source directory by running the make bash script
 
 ```bash
-./docker-make-chris_dev.sh
+./docker-make.sh
 ```
 All the steps performed by the above script are properly documented in the script itself. 
 
@@ -142,7 +157,7 @@ docker exec -it chrisultronbackend_chris_dev_run_1 coverage report
 ### Using httpie to play with the REST API 
 A simple GET request:
 ```bash
-http http://localhost:8000/api/v1/
+http -a cube:cube1234 http://localhost:8000/api/v1/
 ```
 A simple POST request:
 ```bash
@@ -161,7 +176,7 @@ swift -A http://127.0.0.1:8080/auth/v1.0 -U chris:chris1234 -K testing list user
 Stop and remove CUBE services and storage space by running the destroy bash script from the repository source directory
 
 ```bash
-./docker-destroy-chris_dev.sh
+./docker-destroy.sh
 ```
 
 
@@ -194,3 +209,6 @@ Available [here](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/ChRIS-backe
 #### Wiki.
 
 Available [here](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki).
+
+[license-badge]: https://img.shields.io/github/license/fnndsc/ChRIS_ultron_backEnd.svg
+[last-commit-badge]: https://img.shields.io/github/last-commit/fnndsc/ChRIS_ultron_backEnd.svg

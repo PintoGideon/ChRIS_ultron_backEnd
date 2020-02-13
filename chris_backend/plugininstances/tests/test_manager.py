@@ -11,8 +11,8 @@ from django.conf import settings
 import swiftclient
 
 from plugins.models import Plugin
-from plugins.models import PluginParameter, DefaultPathParameter
-from plugininstances.models import PluginInstance, ComputeResource
+from plugins.models import PluginParameter
+from plugininstances.models import PluginInstance, PathParameter, ComputeResource
 from plugininstances.services import manager
 
 
@@ -27,16 +27,15 @@ class PluginAppManagerTests(TestCase):
                             "description": "A simple chris fs app demo", "version": "0.1",
                             "title": "Simple chris fs app", "license": "Opensource (MIT)",
 
-                            "parameters": [{"optional": True, "action": "store",
+                            "parameters": [{"optional": False, "action": "store",
                                             "help": "look up directory", "type": "path",
-                                            "name": "dir", "flag": "--dir",
-                                            "default": "./"}],
+                                            "name": "dir", "flag": "--dir"}],
 
                             "selfpath": "/usr/src/simplefsapp",
                             "selfexec": "simplefsapp.py", "execshell": "python3"}
 
         self.plugin_fs_name = "simplefsapp"
-        self.username = 'data/foo'
+        self.username = 'foo'
         self.password = 'foo-pass'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
@@ -57,8 +56,6 @@ class PluginAppManagerTests(TestCase):
             flag=parameters[0]['flag'],
             optional=parameters[0]['optional'],
         )
-        default = parameters[0]['default']
-        DefaultPathParameter.objects.get_or_create(plugin_param=plg_param, value=default)
 
         # create user
         User.objects.create_user(username=self.username, password=self.password)
@@ -77,9 +74,13 @@ class PluginAppManagerTests(TestCase):
                                    return_value=None) as charm_app_manage_mock:
                 user = User.objects.get(username=self.username)
                 plugin = Plugin.objects.get(name=self.plugin_fs_name)
-                pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
                                             compute_resource=plugin.compute_resource)
-                parameter_dict = {'dir': './'}
+                pl_param = plugin.parameters.all()[0]
+                PathParameter.objects.get_or_create(plugin_inst=pl_inst,
+                                                    plugin_param=pl_param,
+                                                    value=self.username)
+                parameter_dict = {'dir': self.username}
 
                 manager.PluginAppManager.run_plugin_app(pl_inst,
                                                parameter_dict,
@@ -111,9 +112,13 @@ class PluginAppManagerTests(TestCase):
 
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                            compute_resource=plugin.compute_resource)
-        parameter_dict = {'dir': './'}
+        (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                                             compute_resource=plugin.compute_resource)
+        pl_param = plugin.parameters.all()[0]
+        (path_param, tf) = PathParameter.objects.get_or_create(plugin_inst=pl_inst,
+                                                               plugin_param=pl_param,
+                                                               value=self.username)
+        parameter_dict = {'dir': self.username}
         manager.PluginAppManager.run_plugin_app(pl_inst,
                                        parameter_dict,
                                        service             = 'pfcon',
@@ -137,9 +142,12 @@ class PluginAppManagerTests(TestCase):
 
                 user = User.objects.get(username=self.username)
                 plugin = Plugin.objects.get(name=self.plugin_fs_name)
-                pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                    compute_resource=plugin.compute_resource)
-
+                (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                            compute_resource=plugin.compute_resource)
+                pl_param = plugin.parameters.all()[0]
+                PathParameter.objects.get_or_create(plugin_inst=pl_inst,
+                                                    plugin_param=pl_param,
+                                                    value=self.username)
                 manager.PluginAppManager.check_plugin_app_exec_status(pl_inst)
                 self.assertEqual(pl_inst.status, 'started')
                 charm_init_mock.assert_called_with(plugin_inst=pl_inst)
@@ -158,9 +166,12 @@ class PluginAppManagerTests(TestCase):
         """
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                compute_resource=plugin.compute_resource)
-        parameter_dict = {'dir': './'}
+        (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                                             compute_resource=plugin.compute_resource)
+        pl_param = plugin.parameters.all()[0]
+        PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
+                                            value=self.username)
+        parameter_dict = {'dir': self.username}
 
         manager.PluginAppManager.run_plugin_app(pl_inst,
                                        parameter_dict,
@@ -173,7 +184,7 @@ class PluginAppManagerTests(TestCase):
 
         # In the following we keep checking the status until the job ends with
         # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
-        # max number of attempts at 2 second intervals.
+        # max number of attempts at 3 second intervals.
         maxLoopTries    = 20
         currentLoop     = 1
         b_checkAgain    = True
@@ -182,7 +193,7 @@ class PluginAppManagerTests(TestCase):
             if str_responseStatus == 'finishedSuccessfully':
                 b_checkAgain = False
             else:
-                time.sleep(2)
+                time.sleep(3)
             currentLoop += 1
             if currentLoop == maxLoopTries:
                 b_checkAgain = False

@@ -1,5 +1,5 @@
 
-import os
+import pathlib
 
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
@@ -7,10 +7,11 @@ from rest_framework.reverse import reverse
 
 from collectionjson.fields import ItemLinkField
 from plugins.models import TYPES
+from feeds.models import Feed
 
 from .models import PluginInstance, PluginInstanceFile
 from .models import FloatParameter, IntParameter, BoolParameter
-from .models import PathParameter, StrParameter
+from .models import PathParameter, UnextpathParameter, StrParameter
 
 
 class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
@@ -150,7 +151,7 @@ class PluginInstanceFileSerializer(serializers.HyperlinkedModelSerializer):
         format = self.context['format']
         url = url_field.get_url(obj, view, request, format)
         # return url = current url + file name
-        return url + os.path.basename(obj.fname.name)
+        return url + pathlib.Path(obj.fname.name).name
 
 
 class StrParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -209,6 +210,31 @@ class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
                   'plugin_param')
 
 
+def validate_paths(user, string):
+    """
+    Custom function to check that a user is allowed to access the provided object storage
+    paths.
+    """
+    path_list = [s.strip() for s in string.split(',')]
+    for path in path_list:
+        path_parts = pathlib.Path(path).parts
+        if path_parts[0] != user.username:
+            if len(path_parts) == 1 or path_parts[1] == 'uploads':
+                raise serializers.ValidationError(
+                    ["You do not have permission to access this path."])
+            try:
+                # file paths should be of the form <username>/feed_<id>/..
+                feed_id = path_parts[1].split('_')[-1]
+                feed = Feed.objects.get(pk=feed_id)
+            except (ValueError, Feed.DoesNotExist):
+                raise serializers.ValidationError(
+                    ["This field may not be an invalid path."])
+            if user not in feed.owner.all():
+                raise serializers.ValidationError(
+                    ["You do not have permission to access this path."])
+    return ','.join(path_list)
+
+
 class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
@@ -221,6 +247,50 @@ class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
         model = PathParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
+
+    def __init__(self, *args, **kwargs):
+        """
+        Overriden to get the request user as a keyword argument at object creation.
+        """
+        self.user = kwargs.pop('user')
+        super(PathParameterSerializer, self).__init__(*args, **kwargs)
+
+    def validate_value(self, value):
+        """
+        Overriden to check that the user making the request is allowed to access
+        the provided object storage paths (value should be a string of paths separated
+        by commas).
+        """
+        return validate_paths(self.user, value)
+
+
+class UnextpathParameterSerializer(serializers.HyperlinkedModelSerializer):
+    param_name = serializers.ReadOnlyField(source='plugin_param.name')
+    type = serializers.ReadOnlyField(source='plugin_param.type')
+    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
+                                                 read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
+                                                 read_only=True)
+
+    class Meta:
+        model = UnextpathParameter
+        fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
+                  'plugin_param')
+
+    def __init__(self, *args, **kwargs):
+        """
+        Overriden to get the request user as a keyword argument at object creation.
+        """
+        self.user = kwargs.pop('user')
+        super(UnextpathParameterSerializer, self).__init__(*args, **kwargs)
+
+    def validate_value(self, value):
+        """
+        Overriden to check that the user making the request is allowed to access
+        the provided object storage paths (value should be a string of paths separated
+        by commas).
+        """
+        return validate_paths(self.user, value)
 
 
 class GenericParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -259,4 +329,5 @@ PARAMETER_SERIALIZERS = {'string': StrParameterSerializer,
                          'integer': IntParameterSerializer,
                          'float': FloatParameterSerializer,
                          'boolean': BoolParameterSerializer,
-                         'path': PathParameterSerializer}
+                         'path': PathParameterSerializer,
+                         'unextpath': UnextpathParameterSerializer}

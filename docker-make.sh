@@ -2,11 +2,11 @@
 #
 # NAME
 #
-#   docker-make-chris_dev.sh
+#   docker-make.sh
 #
 # SYNPOSIS
 #
-#   docker-make-chris_dev.sh    [-r <service>]                  \
+#   docker-make.sh    [-r <service>]                  \
 #                               [-a <swarm-advertise-adr>]      \
 #                               [-p] [-s] [-i] [-d]             \
 #                               [-U] [-I]                       \
@@ -16,7 +16,7 @@
 #
 # DESC
 # 
-#   'docker-make-chris_dev.sh' is the main entry point for instantiating a 
+#   'docker-make.sh' is the main entry point for instantiating a
 #   complete backend dev environment.
 #
 #   It creates a pattern of directories and symbolic links that reflect the
@@ -214,7 +214,7 @@ else
     if (( ! b_skipIntro )) ; then 
         title -d 1 "Will use containers with following version info:"
         for CONTAINER in ${A_CONTAINER[@]} ; do
-            if [[   $CONTAINER != "chris:dev"    && \
+            if [[   $CONTAINER != "chris:dev"            && \
                     $CONTAINER != "chris_store"          && \
                     $CONTAINER != "pl-pacsretrieve"      && \
                     $CONTAINER != "pl-pacsquery"         && \
@@ -235,14 +235,14 @@ else
         printf "${White}%40s\t\t" "pfurl inside ${CREPO}/CUBE"
         Ver=$(echo $CMD | sh | grep Version)
         echo -e "$Green$Ver"
-        CMD="docker run --rm --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsquery --version"
-        printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsquery"
-        Ver=$(echo $CMD | sh | grep Version)
-        echo -e "$Green$Ver"
-        CMD="docker run --rm --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsretrieve --version"
-        printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsretrieve"
-        Ver=$(echo $CMD | sh | grep Version)
-        echo -e "$Green$Ver"
+        # CMD="docker run --rm --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsquery --version"
+        # printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsquery"
+        # Ver=$(echo $CMD | sh | grep Version)
+        # echo -e "$Green$Ver"
+        # CMD="docker run --rm --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsretrieve --version"
+        # printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsretrieve"
+        # Ver=$(echo $CMD | sh | grep Version)
+        # echo -e "$Green$Ver"
         windowBottom
     fi
 
@@ -274,17 +274,11 @@ else
     chmod -R 755 $(pwd)
     windowBottom
 
-    title -d 1 "Creating tmp dirs for volume mounting into containers..."
-    echo "${STEP}.1: Remove tree root 'FS'.."
-    rm -fr ./FS 
-    echo "${STEP}.2: Create tree structure for remote services in host filesystem..."
+    title -d 1 "Checking required FS directory tree for remote services in host filesystem..."
     mkdir -p FS/local
-    chmod 777 FS/local
     mkdir -p FS/remote
-    chmod 777 FS/remote
-    mkdir -p FS/data 
-    chmod 777 FS/data
-    chmod 777 FS
+    mkdir -p FS/data
+    chmod -R 777 FS
     b_FSOK=1
     type -all tree >/dev/null 2>/dev/null
     if (( ! $? )) ; then
@@ -306,6 +300,7 @@ else
         printf "${Yellow}\nThis script will now exit with code '1'.\n\n"
         exit 1
     fi
+    echo "Done."
     windowBottom
 
     title -d 1 "Starting CUBE containerized development environment using " " ./docker-compose_dev.yml"
@@ -322,7 +317,7 @@ else
     fi
     windowBottom
 
-    title -d 1 "Waiting until mysql server is ready to accept connections..."
+    title -d 1 "Waiting until ChRIS database server is ready to accept connections..."
     docker-compose -f docker-compose_dev.yml exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
     # Give all permissions to chris user in the DB. This is required for the Django tests:
     docker-compose -f docker-compose_dev.yml exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
@@ -340,8 +335,8 @@ else
         windowBottom
     fi
 
-    title -d 1 "Waiting until the ChRIS store is ready to accept connections..."
-    docker-compose -f docker-compose_dev.yml exec chrisstore sh -c 'while ! curl -sSf http://localhost:8010/api/v1/ 2> /dev/null; do sleep 5; done;'
+    title -d 1 "Waiting until ChRIS store is ready to accept connections..."
+    docker-compose -f docker-compose_dev.yml exec chrisstore sh -c 'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;'
     windowBottom
 
     title -d 1 "Creating two ChRIS STORE API users"
@@ -375,8 +370,6 @@ else
                          "simplefsapp_moc:moc"
                          "simpledsapp"
                          "simpledsapp_moc:moc"
-                         "pacsquery"
-                         "pacsretrieve"
                          "s3retrieve"
                          "s3push"
                          "dircopy"
@@ -387,6 +380,10 @@ else
                          "freesurfer_pp"
                          "z2labelmap"
                          "mri10yr06mo01da_normal"
+                         "mpcs_moc:moc"
+                         "freesurfer_pp_moc:moc"
+                         "z2labelmap_moc:moc"
+                         "mri10yr06mo01da_normal_moc:moc"
     )
 
     title -d 1 "Checking on container plugins..."
